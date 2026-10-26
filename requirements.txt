@@ -1,0 +1,8 @@
+torch==2.2.2
+torchvision==0.17.2
+numpy==1.26.4
+opencv-python-headless==4.11.0.86
+fvcore==0.1.5.post20221221
+iopath==0.1.10
+gradio==5.49.1
+pandas

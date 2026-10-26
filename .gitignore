@@ -1,0 +1,7 @@
+__pycache__/
+.venv/
+.gradio/
+.DS_Store
+data/
+*.avi
+*.mp4
