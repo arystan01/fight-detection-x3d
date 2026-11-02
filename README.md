@@ -59,6 +59,59 @@ On 400 validation videos:
 | no fight | 178 | 22 |
 | fight | 25 | 175 |
 
+## Agent
+
+The model alone gives a lot of false alarms on crowds, hugs, sports etc. So there is a second step: when X3D thinks there is a fight, a small vision language model looks at 8 frames and says if it's really a fight and what is happening. If yes, the clip goes to Telegram.
+
+```
+camera -> X3D (every 0.5s) -> fight? -> Qwen3.5-2B looks at frames -> fight? -> Telegram clip + description
+```
+
+X3D here looks at 3 squares of the frame (left, center, right) instead of only the center and uses a lower threshold (0.3), so it misses less. The VLM removes the extra false alarms.
+
+Run the VLM (needs vllm, GPU with 8GB+):
+
+```bash
+pip install vllm
+bash vlm.sh                     # base Qwen/Qwen3.5-2B
+bash vlm.sh path/to/finetuned   # or your fine-tuned one
+```
+
+Then run the agent on a video or a camera:
+
+```bash
+export TG_TOKEN=...   # optional, telegram bot
+export TG_CHAT=...
+python agent.py video.mp4
+python agent.py rtsp://user:pass@camera-ip/stream rtsp://...
+```
+
+Every decision is saved to `alerts.jsonl`, clips to `alerts/`.
+
+### Fine-tuning the VLM
+
+The base 2B model rejects too many real fights. Fine-tuning it on the same fight / no fight videos fixes that. Takes about 40 min on a RTX 2080 Ti.
+
+```bash
+pip install peft transformers
+python train_vlm.py data/train my-vlm
+bash vlm.sh my-vlm
+python eval_agent.py data/val
+```
+
+### Agent results
+
+On the same 400 validation videos:
+
+| | Precision | Recall | F1 | False alarms |
+|---|---|---|---|---|
+| X3D only (center, threshold 0.6) | 91.0% | 85.5% | 88.1% | 17 |
+| X3D (3 squares, 0.3) | 76.9% | 98.0% | 86.2% | 59 |
+| X3D + base Qwen3.5-2B | 85.2% | 97.5% | 90.9% | 34 |
+| X3D + fine-tuned Qwen3.5-2B | **92.6%** | **94.5%** | **93.6%** | 15 |
+
+The VLM answers in ~0.6s on a RTX 2080 Ti.
+
 ## Limitations
 
 - The model only sees the center square of the video. A fight at the edge of the frame can be missed.
